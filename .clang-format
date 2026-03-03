@@ -1,0 +1,57 @@
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+UseTab: Never
+
+# Spacing around parentheses (if(condition) vs if (condition))
+SpaceBeforeParens: Never
+
+# Pointer alignment (GLFWwindow* window)
+PointerAlignment: Left
+
+# Include sorting (keeps your manual groups of headers)
+IncludeBlocks: Preserve
+
+# Allow long lines (useful for OpenGL comments)
+ColumnLimit: 0
+
+# Add a space after //
+SpacesInContainerLiterals: true
+
+AlignAfterOpenBracket: true
+
+AlignArrayOfStructures: Right
+
+AlignConsecutiveAssignments: Consecutive
+
+AlignConsecutiveDeclarations: Consecutive
+
+AlignConsecutiveMacros: Consecutive
+
+AlignEscapedNewlines: LeftWithLastLine
+
+AlignOperands: AlignAfterOperator
+
+SortIncludes: false
+
+IndentCaseBlocks: true
+IndentCaseLabels: true
+
+Cpp11BracedListStyle: true
+
+AllowShortFunctionsOnASingleLine: All
+
+AllowShortIfStatementsOnASingleLine: WithoutElse
+
+AllowShortLoopsOnASingleLine: true
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  BeforeElse: true
+  
+AllowShortCaseExpressionOnASingleLine: true
+
+AllowShortCaseLabelsOnASingleLine: true
+
