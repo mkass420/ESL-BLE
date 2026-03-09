@@ -1,10 +1,10 @@
-PROJECT_NAME     := estc_adverts_pca10059_s140
+PROJECT_NAME     := esl-ble
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := _build
 DFU_PORT         ?= /dev/ttyACM0
 
-SDK_ROOT := ../../../../../..
-PROJ_DIR := ../../..
+SDK_ROOT ?= ${HOME}/esl-nsdk
+PROJ_DIR := .
 
 $(OUTPUT_DIRECTORY)/nrf52840_xxaa.out: \
   LINKER_SCRIPT  := estc_adverts_gcc_nrf52.ld
@@ -97,7 +97,7 @@ SRC_FILES += \
 
 # Include folders common to all targets
 INC_FOLDERS += \
-  ../config \
+  $(PROJ_DIR)/config \
   $(SDK_ROOT)/modules/nrfx/mdk \
   $(SDK_ROOT)/modules/nrfx/hal \
   $(SDK_ROOT)/modules/nrfx/drivers/include \
@@ -256,6 +256,9 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 # keep every function in a separate section, this allows linker to discard unused ones
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin -fshort-enums
+
+CFLAGS += -Wno-array-bounds
+CFLAGS += -Wno-error=array-bounds
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
