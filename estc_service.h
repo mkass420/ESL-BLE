@@ -33,6 +33,7 @@
 
 #include <stdint.h>
 
+#include "app_util.h"
 #include "ble.h"
 #include "sdk_errors.h"
 
@@ -46,19 +47,28 @@
 
 // TODO: 3. Pick a characteristic UUID and define it:
 // #define ESTC_GATT_CHAR_1_UUID 0x0001
-#define ESTC_GATT_CHAR_1_UUID 0x1337
+#define ESTC_GATT_CHAR_1_UUID_VALUE 0x1337
+#define ESTC_GATT_CHAR_2_UUID_VALUE 0x2337
+#define ESTC_GATT_CHAR_3_UUID_VALUE 0x3337
+
+typedef enum{
+    ESTC_GATT_CHAR_1,
+    ESTC_GATT_CHAR_2,
+    ESTC_GATT_CHAR_3,
+    ESTC_GATT_CHAR_COUNT
+} estc_gatt_chars_t;
 
 typedef struct {
     uint16_t service_handle;
     uint16_t connection_handle;
     // TODO: 6.3. Add handles for characterstic (type: ble_gatts_char_handles_t)
-    ble_gatts_char_handles_t characteristic_handle;
+    ble_gatts_char_handles_t characteristic_handles[ESTC_GATT_CHAR_COUNT];
 } ble_estc_service_t;
 
 ret_code_t estc_ble_service_init(ble_estc_service_t* service);
 
-void estc_ble_service_on_ble_event(const ble_evt_t *ble_evt, void *ctx);
+void estc_ble_service_on_ble_event(const ble_evt_t* ble_evt, void* ctx);
 
-void estc_update_characteristic_1_value(ble_estc_service_t *service, int32_t *value);
+//void estc_update_characteristic_1_value(ble_estc_service_t* service, int32_t* value);
 
 #endif /* ESTC_SERVICE_H__ */
