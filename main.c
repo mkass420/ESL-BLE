@@ -52,6 +52,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "ble_gatts.h"
 #include "ble_types.h"
 #include "nordic_common.h"
 #include "nrf.h"
@@ -386,7 +387,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
             break;
-
+            
         default:
             // No implementation needed.
             break;

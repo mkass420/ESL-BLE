@@ -43,6 +43,7 @@
 #include "softdevice/s113/headers/nrf_error.h"
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 /* some handy macros */
 #define ESTC_RETURN_IF_ERROR(ret_code)          \
@@ -60,6 +61,8 @@ static ble_uuid_t m_char_uuids[] = {
     [ESTC_GATT_CHAR_3] = {ESTC_GATT_CHAR_3_UUID_VALUE, BLE_UUID_TYPE_VENDOR_BEGIN}
 };
 STATIC_ASSERT(sizeof(m_char_uuids) / sizeof(m_char_uuids[0]) == ESTC_GATT_CHAR_COUNT, "ESTC_GATT_CHAR_COUNT should be equal to number of characteristic uuids inside m_char_uuids[]");
+
+static ble_gatts_value_t m_gatt_value;
 
 static ret_code_t estc_ble_add_characteristic(ble_estc_service_t* service,
                                               estc_gatt_chars_t   char_idx,
@@ -122,7 +125,6 @@ static ret_code_t estc_ble_add_characteristic(ble_estc_service_t* service,
     /* Descriptors should always be read-only, otherwise it is very stupid */
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&user_desc_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&user_desc_md.write_perm);
-    
 
     char_md.p_user_desc_md          = &user_desc_md;
     char_md.p_char_user_desc        = (uint8_t*)user_desc;
@@ -177,4 +179,22 @@ static ret_code_t estc_ble_add_all_characteristics(ble_estc_service_t* service) 
     ESTC_RETURN_IF_ERROR(error_code);
 
     return NRF_SUCCESS;
+}
+
+ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value) {
+    if(char_idx >= ESTC_GATT_CHAR_COUNT) return NRF_ERROR_INVALID_PARAM;
+
+    ret_code_t error_code = NRF_SUCCESS;
+
+    ble_gatts_value_t* p_gatt_value = &m_gatt_value;
+
+    error_code = sd_ble_gatts_value_get(0, service->characteristic_handles[char_idx].value_handle, p_gatt_value);
+    ESTC_RETURN_IF_ERROR(error_code);
+    
+    memcpy(p_gatt_value->p_value, p_value, p_gatt_value->len);
+    
+    error_code = sd_ble_gatts_value_set(0, service->characteristic_handles[char_idx].value_handle, p_gatt_value);
+    ESTC_RETURN_IF_ERROR(error_code);
+    
+    return error_code;
 }

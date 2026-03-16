@@ -51,7 +51,7 @@
 #define ESTC_GATT_CHAR_2_UUID_VALUE 0x2337
 #define ESTC_GATT_CHAR_3_UUID_VALUE 0x3337
 
-typedef enum{
+typedef enum {
     ESTC_GATT_CHAR_1,
     ESTC_GATT_CHAR_2,
     ESTC_GATT_CHAR_3,
@@ -69,6 +69,6 @@ ret_code_t estc_ble_service_init(ble_estc_service_t* service);
 
 void estc_ble_service_on_ble_event(const ble_evt_t* ble_evt, void* ctx);
 
-//void estc_update_characteristic_1_value(ble_estc_service_t* service, int32_t* value);
+ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value);
 
 #endif /* ESTC_SERVICE_H__ */

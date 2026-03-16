@@ -261,6 +261,8 @@ CFLAGS += -fno-builtin -fshort-enums
 CFLAGS += -Wno-array-bounds
 CFLAGS += -Wno-error=array-bounds
 
+CFLAGS += -std=c23
+
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
 # Assembler flags common to all targets
