@@ -100,14 +100,20 @@
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
+#define NOTIFY_TIMER_INTERVAL           APP_TIMER_TICKS(1000)
+#define INDICATE_TIMER_INTERVAL         APP_TIMER_TICKS(3000)
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 BLE_ADVERTISING_DEF(m_advertising);                                             /**< Advertising module instance. */
+APP_TIMER_DEF(m_notify_timer_id);
+APP_TIMER_DEF(m_indicate_timer_id);
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
+static uint32_t m_notify_value = 0;
+static uint32_t m_indicate_value = 0;
 
 static ble_uuid_t m_adv_uuids[] =                                               /**< Universally unique service identifiers. */
 {
@@ -119,6 +125,24 @@ static ble_uuid_t m_adv_uuids[] =                                               
 ble_estc_service_t m_estc_service; /**< ESTC example BLE service */
 
 static void advertising_start(void);
+
+static void notify_timer_handler(void* p_context)
+{
+    UNUSED_PARAMETER(p_context);
+
+    ++m_notify_value;
+    ret_code_t err_code = estc_send_characteristic_value(&m_estc_service, ESTC_GATT_CHAR_NOTIFY, &m_notify_value, sizeof(m_notify_value));
+    APP_ERROR_CHECK(err_code);
+}
+
+static void indicate_timer_handler(void* p_context)
+{
+    UNUSED_PARAMETER(p_context);
+
+    ++m_indicate_value;
+    ret_code_t err_code = estc_send_characteristic_value(&m_estc_service, ESTC_GATT_CHAR_INDICATE, &m_indicate_value, sizeof(m_indicate_value));
+    APP_ERROR_CHECK(err_code);
+}
 
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -145,6 +169,12 @@ static void timers_init(void)
 {
     // Initialize timer module.
     ret_code_t err_code = app_timer_init();
+    APP_ERROR_CHECK(err_code);
+
+    err_code = app_timer_create(&m_notify_timer_id, APP_TIMER_MODE_REPEATED, notify_timer_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = app_timer_create(&m_indicate_timer_id, APP_TIMER_MODE_REPEATED, indicate_timer_handler);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -282,6 +312,11 @@ static void conn_params_init(void)
  */
 static void application_timers_start(void)
 {
+    ret_code_t err_code = app_timer_start(m_notify_timer_id, NOTIFY_TIMER_INTERVAL, NULL);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = app_timer_start(m_indicate_timer_id, INDICATE_TIMER_INTERVAL, NULL);
+    APP_ERROR_CHECK(err_code);
 }
 
 

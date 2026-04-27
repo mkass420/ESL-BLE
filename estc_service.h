@@ -31,6 +31,8 @@
 #ifndef ESTC_SERVICE_H__
 #define ESTC_SERVICE_H__
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "app_util.h"
@@ -50,11 +52,13 @@
 #define ESTC_GATT_CHAR_1_UUID_VALUE 0x1337
 #define ESTC_GATT_CHAR_2_UUID_VALUE 0x2337
 #define ESTC_GATT_CHAR_3_UUID_VALUE 0x3337
+#define ESTC_GATT_CHAR_NOTIFY_UUID_VALUE 0x4A12
+#define ESTC_GATT_CHAR_INDICATE_UUID_VALUE 0x8D2F
 
 typedef enum {
-    ESTC_GATT_CHAR_1,
-    ESTC_GATT_CHAR_2,
-    ESTC_GATT_CHAR_3,
+    ESTC_GATT_CHAR_DEFAULT,
+    ESTC_GATT_CHAR_NOTIFY,
+    ESTC_GATT_CHAR_INDICATE,
     ESTC_GATT_CHAR_COUNT
 } estc_gatt_chars_t;
 
@@ -64,6 +68,9 @@ typedef struct {
     // TODO: 6.3. Add handles for characterstic (type: ble_gatts_char_handles_t)
     ble_gatts_char_handles_t characteristic_handles[ESTC_GATT_CHAR_COUNT];
     uint8_t uuid_type;
+    bool notification_enabled;
+    bool indication_enabled;
+    bool indication_in_flight;
 } ble_estc_service_t;
 
 ret_code_t estc_ble_service_init(ble_estc_service_t* service);
@@ -71,5 +78,7 @@ ret_code_t estc_ble_service_init(ble_estc_service_t* service);
 void estc_ble_service_on_ble_event(const ble_evt_t* ble_evt, void* ctx);
 
 ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value, size_t value_len);
+
+ret_code_t estc_send_characteristic_value(ble_estc_service_t* service, estc_gatt_chars_t char_idx, void* p_value, size_t value_len);
 
 #endif /* ESTC_SERVICE_H__ */
