@@ -39,8 +39,6 @@
 #include "ble_gatts.h"
 #include "ble_srv_common.h"
 #include "sdk_errors.h"
-#include "softdevice/s113/headers/ble_types.h"
-#include "softdevice/s113/headers/nrf_error.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -56,25 +54,27 @@
         BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(ptr)
 
 static ble_uuid_t m_char_uuids[] = {
-    [ESTC_GATT_CHAR_1] = {ESTC_GATT_CHAR_1_UUID_VALUE, BLE_UUID_TYPE_VENDOR_BEGIN},
-    [ESTC_GATT_CHAR_2] = {ESTC_GATT_CHAR_2_UUID_VALUE, BLE_UUID_TYPE_VENDOR_BEGIN},
-    [ESTC_GATT_CHAR_3] = {ESTC_GATT_CHAR_3_UUID_VALUE, BLE_UUID_TYPE_VENDOR_BEGIN}
+    [ESTC_GATT_CHAR_1] = {ESTC_GATT_CHAR_1_UUID_VALUE, BLE_UUID_TYPE_UNKNOWN},
+    [ESTC_GATT_CHAR_2] = {ESTC_GATT_CHAR_2_UUID_VALUE, BLE_UUID_TYPE_UNKNOWN},
+    [ESTC_GATT_CHAR_3] = {ESTC_GATT_CHAR_3_UUID_VALUE, BLE_UUID_TYPE_UNKNOWN}
 };
 STATIC_ASSERT(sizeof(m_char_uuids) / sizeof(m_char_uuids[0]) == ESTC_GATT_CHAR_COUNT, "ESTC_GATT_CHAR_COUNT should be equal to number of characteristic uuids inside m_char_uuids[]");
-
-static ble_gatts_value_t m_gatt_value;
 
 static ret_code_t estc_ble_add_characteristic(ble_estc_service_t* service,
                                               estc_gatt_chars_t   char_idx,
                                               bool                read_prop,
                                               bool                write_prop,
-                                              uint16_t            value_size,
-                                              void*               p_init_value);
+                                              size_t              value_size,
+                                              void*               p_init_value,
+                                              size_t              max_value_size);
 
 static ret_code_t estc_ble_add_all_characteristics(ble_estc_service_t* service);
 
 ret_code_t estc_ble_service_init(ble_estc_service_t* service) {
     ret_code_t error_code = NRF_SUCCESS;
+
+    service->connection_handle = BLE_CONN_HANDLE_INVALID;
+    service->uuid_type         = BLE_UUID_TYPE_UNKNOWN;
 
     ble_uuid128_t base_uuid    = {ESTC_BASE_UUID};
     ble_uuid_t    service_uuid = {ESTC_SERVICE_UUID, BLE_UUID_TYPE_UNKNOWN};
@@ -82,6 +82,12 @@ ret_code_t estc_ble_service_init(ble_estc_service_t* service) {
     // TODO: 3. Add service UUIDs to the BLE stack table using `sd_ble_uuid_vs_add`
     error_code = sd_ble_uuid_vs_add(&base_uuid, &service_uuid.type);
     ESTC_RETURN_IF_ERROR(error_code);
+
+    service->uuid_type = service_uuid.type;
+
+    m_char_uuids[ESTC_GATT_CHAR_1].type = service_uuid.type;
+    m_char_uuids[ESTC_GATT_CHAR_2].type = service_uuid.type;
+    m_char_uuids[ESTC_GATT_CHAR_3].type = service_uuid.type;
 
     // TODO: 4. Add service to the BLE stack using `sd_ble_gatts_service_add`
     error_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &service_uuid, &service->service_handle);
@@ -98,18 +104,16 @@ static ret_code_t estc_ble_add_characteristic(ble_estc_service_t* service,
                                               estc_gatt_chars_t   char_idx,
                                               bool                read_prop,
                                               bool                write_prop,
-                                              uint16_t            value_size,
-                                              void*               p_init_value) {
+                                              size_t              value_size,
+                                              void*               p_init_value,
+                                              size_t              max_value_size) {
     if(char_idx >= ESTC_GATT_CHAR_COUNT) return NRF_ERROR_INVALID_PARAM;
+    if(value_size > max_value_size) return NRF_ERROR_INVALID_LENGTH;
 
     ret_code_t error_code = NRF_SUCCESS;
 
     // TODO: 6.1. Add custom characteristic UUID using `sd_ble_uuid_vs_add`, same as in step 4
-    ble_uuid128_t base_uuid = {ESTC_BASE_UUID};
-    ble_uuid_t    char_uuid = m_char_uuids[char_idx];
-
-    error_code = sd_ble_uuid_vs_add(&base_uuid, &char_uuid.type);
-    ESTC_RETURN_IF_ERROR(error_code);
+    ble_uuid_t char_uuid = m_char_uuids[char_idx];
 
     // TODO: 6.5. Configure Characteristic metadata (enable read and write)
     ble_gatts_char_md_t char_md = {0};
@@ -117,7 +121,7 @@ static ret_code_t estc_ble_add_characteristic(ble_estc_service_t* service,
     char_md.char_props.write    = write_prop;
 
     char user_desc[28] = {0};
-    sprintf(user_desc, "My cool descriptor number %d", char_idx);
+    snprintf(user_desc, sizeof(user_desc), "My cool descriptor number %d", char_idx);
 
     ble_gatts_attr_md_t user_desc_md = {0};
     user_desc_md.vloc                = BLE_GATTS_VLOC_STACK;
@@ -146,13 +150,14 @@ static ret_code_t estc_ble_add_characteristic(ble_estc_service_t* service,
 
     // TODO: 6.7. Set characteristic length in number of bytes in attr_char_value structure
     attr_char_value.init_len = value_size;
-    attr_char_value.max_len  = value_size;
+    attr_char_value.max_len  = max_value_size;
 
     if(p_init_value != NULL) {
         attr_char_value.p_value = (uint8_t*)p_init_value;
     }
 
     // TODO: 6.4. Add new characteristic to the service using `sd_ble_gatts_characteristic_add`
+    //
     error_code = sd_ble_gatts_characteristic_add(service->service_handle,
                                                  &char_md,
                                                  &attr_char_value,
@@ -169,32 +174,84 @@ static ret_code_t estc_ble_add_all_characteristics(ble_estc_service_t* service) 
     char    val2[] = "abcdef";
     uint8_t val3[] = {0, 1, 2, 3, 6};
 
-    error_code = estc_ble_add_characteristic(service, ESTC_GATT_CHAR_1, true, true, sizeof(val1), &val1);
+    error_code = estc_ble_add_characteristic(service, ESTC_GATT_CHAR_1, true, true, sizeof(val1), &val1, sizeof(val1));
     ESTC_RETURN_IF_ERROR(error_code);
 
-    error_code = estc_ble_add_characteristic(service, ESTC_GATT_CHAR_2, true, false, sizeof(val2), &val2);
+    error_code = estc_ble_add_characteristic(service, ESTC_GATT_CHAR_2, true, false, sizeof(val2), &val2, sizeof(val2));
     ESTC_RETURN_IF_ERROR(error_code);
 
-    error_code = estc_ble_add_characteristic(service, ESTC_GATT_CHAR_3, false, false, sizeof(val3), &val3);
+    error_code = estc_ble_add_characteristic(service, ESTC_GATT_CHAR_3, false, false, sizeof(val3), &val3, sizeof(val3));
     ESTC_RETURN_IF_ERROR(error_code);
 
     return NRF_SUCCESS;
 }
 
-ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value) {
+ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value, size_t value_len) {
+    if(service == NULL)                  return NRF_ERROR_INVALID_PARAM;
     if(char_idx >= ESTC_GATT_CHAR_COUNT) return NRF_ERROR_INVALID_PARAM;
+    if(p_value == NULL)                  return NRF_ERROR_INVALID_PARAM;
+    if(value_len == 0)                   return NRF_ERROR_INVALID_LENGTH;
+    if(value_len > UINT16_MAX)           return NRF_ERROR_INVALID_LENGTH;
 
-    ret_code_t error_code = NRF_SUCCESS;
+    ble_gatts_value_t gatt_value = {
+        .len     = (uint16_t)value_len,
+        .offset  = 0,
+        .p_value = (uint8_t*)p_value
+    };
 
-    ble_gatts_value_t* p_gatt_value = &m_gatt_value;
-
-    error_code = sd_ble_gatts_value_get(0, service->characteristic_handles[char_idx].value_handle, p_gatt_value);
+    ret_code_t error_code = sd_ble_gatts_value_set(service->connection_handle, service->characteristic_handles[char_idx].value_handle, &gatt_value);
     ESTC_RETURN_IF_ERROR(error_code);
-    
-    memcpy(p_gatt_value->p_value, p_value, p_gatt_value->len);
-    
-    error_code = sd_ble_gatts_value_set(0, service->characteristic_handles[char_idx].value_handle, p_gatt_value);
-    ESTC_RETURN_IF_ERROR(error_code);
-    
+
     return error_code;
+}
+
+ret_code_t estc_read_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value, size_t* p_value_len) {
+    if(service == NULL)                  return NRF_ERROR_INVALID_PARAM;
+    if(char_idx >= ESTC_GATT_CHAR_COUNT) return NRF_ERROR_INVALID_PARAM;
+    if(p_value == NULL)                  return NRF_ERROR_INVALID_PARAM;
+    if(p_value_len == NULL)              return NRF_ERROR_INVALID_PARAM;
+    if(*p_value_len == 0)                return NRF_ERROR_INVALID_LENGTH;
+    if(*p_value_len > UINT16_MAX)        return NRF_ERROR_INVALID_LENGTH;
+
+    ble_gatts_value_t gatt_value = {
+        .len     = (uint16_t)*p_value_len,
+        .offset  = 0,
+        .p_value = (uint8_t*)p_value
+    };
+
+    ret_code_t error_code = sd_ble_gatts_value_get(service->connection_handle, service->characteristic_handles[char_idx].value_handle, &gatt_value);
+    ESTC_RETURN_IF_ERROR(error_code);
+
+    *p_value_len = gatt_value.len;
+
+    return error_code;
+}
+
+void estc_ble_service_on_ble_event(const ble_evt_t* ble_evt, void* ctx) {
+    if(ble_evt == NULL) return;
+    if(ctx == NULL)     return;
+
+    ble_estc_service_t* service = (ble_estc_service_t*)ctx;
+
+    switch(ble_evt->header.evt_id) {
+        case BLE_GAP_EVT_CONNECTED:
+            service->connection_handle = ble_evt->evt.gap_evt.conn_handle;
+            break;
+
+        case BLE_GAP_EVT_DISCONNECTED:
+            service->connection_handle = BLE_CONN_HANDLE_INVALID;
+            break;
+
+        case BLE_GATTS_EVT_WRITE:
+            for(size_t i = 0; i < ESTC_GATT_CHAR_COUNT; ++i) {
+                if(ble_evt->evt.gatts_evt.params.write.handle == service->characteristic_handles[i].value_handle) {
+                    NRF_LOG_DEBUG("ESTC characteristic %u written", (unsigned int)i);
+                    break;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
 }

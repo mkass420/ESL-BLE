@@ -63,12 +63,13 @@ typedef struct {
     uint16_t connection_handle;
     // TODO: 6.3. Add handles for characterstic (type: ble_gatts_char_handles_t)
     ble_gatts_char_handles_t characteristic_handles[ESTC_GATT_CHAR_COUNT];
+    uint8_t uuid_type;
 } ble_estc_service_t;
 
 ret_code_t estc_ble_service_init(ble_estc_service_t* service);
 
 void estc_ble_service_on_ble_event(const ble_evt_t* ble_evt, void* ctx);
 
-ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value);
+ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value, size_t value_len);
 
 #endif /* ESTC_SERVICE_H__ */

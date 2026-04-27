@@ -113,7 +113,7 @@ static ble_uuid_t m_adv_uuids[] =                                               
 {
     {BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE},
     // TODO: 5. Add ESTC service UUID to the table
-    {ESTC_SERVICE_UUID, BLE_UUID_TYPE_VENDOR_BEGIN}
+    {ESTC_SERVICE_UUID, BLE_UUID_TYPE_UNKNOWN}
 };
 
 ble_estc_service_t m_estc_service; /**< ESTC example BLE service */
@@ -218,6 +218,8 @@ static void services_init(void)
 
     err_code = estc_ble_service_init(&m_estc_service);
     APP_ERROR_CHECK(err_code);
+
+    m_adv_uuids[1].type = m_estc_service.uuid_type;
 }
 
 
@@ -346,6 +348,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     {
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("Disconnected (conn_handle: %d)", p_ble_evt->evt.gap_evt.conn_handle);
+            m_conn_handle = BLE_CONN_HANDLE_INVALID;
             // LED indication will be changed when advertising starts.
             break;
 
@@ -387,11 +390,12 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
             break;
-            
         default:
             // No implementation needed.
             break;
     }
+
+    estc_ble_service_on_ble_event(p_ble_evt, &m_estc_service);
 }
 
 
@@ -462,8 +466,10 @@ static void advertising_init(void)
     init.advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
 
     // TODO: 6. Consider moving the device characteristics to the Scan Response if necessary
-    init.advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
+    init.advdata.uuids_complete.uuid_cnt = 1;
     init.advdata.uuids_complete.p_uuids  = m_adv_uuids;
+    init.srdata.uuids_complete.uuid_cnt  = (sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0])) - 1;
+    init.srdata.uuids_complete.p_uuids   = &m_adv_uuids[1];
 
     init.config.ble_adv_fast_enabled  = true;
     init.config.ble_adv_fast_interval = APP_ADV_INTERVAL;
