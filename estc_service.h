@@ -17,8 +17,8 @@
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
  * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
@@ -32,53 +32,73 @@
 #define ESTC_SERVICE_H__
 
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 
 #include "app_util.h"
 #include "ble.h"
 #include "sdk_errors.h"
 
-// TODO: 1. Generate random BLE UUID (Version 4 UUID) and define it in the following format:
-// #define ESTC_BASE_UUID { 0xF6, 0xCE, 0x0F, 0xC4, 0xCE, 0x9F, /* - */ 0xC3, 0x99, /* - */ 0xF7, 0x4D, /* - */ 0xDB, 0xB9, /* - */ 0x00, 0x00, 0xEC, 0x39 } // UUID: EC39xxxx-B9DB-4DF7-99C3-9FCEC40FCEF6
-#define ESTC_BASE_UUID {0x4E, 0x22, 0xFC, 0xA8, 0x85, 0x18, /* - */ 0x0C, 0x8D, /* - */ 0xF8, 0x40, /* - */ 0x8B, 0xF0, /* - */ 0x00, 0x00, 0xC2, 0x3E} // UUID: 3ec2xxxx-f08b-40f8-8d0c-1885a8fc224e
-
-// TODO: 2. Pick a random service 16-bit UUID and define it:
-// #define ESTC_SERVICE_UUID 0xabcd
-#define ESTC_SERVICE_UUID 0x6969
-
-// TODO: 3. Pick a characteristic UUID and define it:
-// #define ESTC_GATT_CHAR_1_UUID 0x0001
-#define ESTC_GATT_CHAR_1_UUID_VALUE 0x1337
-#define ESTC_GATT_CHAR_2_UUID_VALUE 0x2337
-#define ESTC_GATT_CHAR_3_UUID_VALUE 0x3337
-#define ESTC_GATT_CHAR_NOTIFY_UUID_VALUE 0x4A12
-#define ESTC_GATT_CHAR_INDICATE_UUID_VALUE 0x8D2F
+#define ESTC_BASE_UUID           {0x4E, 0x22, 0xFC, 0xA8, 0x85, 0x18, 0x0C, 0x8D, 0xF8, 0x40, 0x8B, 0xF0, 0x00, 0x00, 0xC2, 0x3E}
+#define ESTC_SERVICE_UUID        0x6969
+#define ESTC_LED_STATE_UUID      0x6970
+#define ESTC_LED_HUE_UUID        0x6971
+#define ESTC_LED_SATURATION_UUID 0x6972
+#define ESTC_LED_VALUE_UUID      0x6973
 
 typedef enum {
-    ESTC_GATT_CHAR_DEFAULT,
-    ESTC_GATT_CHAR_NOTIFY,
-    ESTC_GATT_CHAR_INDICATE,
-    ESTC_GATT_CHAR_COUNT
-} estc_gatt_chars_t;
+    ESTC_LED_CHAR_STATE = 0,
+    ESTC_LED_CHAR_HUE,
+    ESTC_LED_CHAR_SATURATION,
+    ESTC_LED_CHAR_VALUE,
+    ESTC_LED_CHAR_COUNT
+} estc_led_char_t;
+
+typedef struct ble_estc_service_s ble_estc_service_t;
+
+typedef void (*estc_service_write_handler_t)(ble_estc_service_t* p_service,
+                                             estc_led_char_t     characteristic,
+                                             uint8_t const*      p_data,
+                                             uint16_t            len,
+                                             void*               p_context);
 
 typedef struct {
-    uint16_t service_handle;
-    uint16_t connection_handle;
-    // TODO: 6.3. Add handles for characterstic (type: ble_gatts_char_handles_t)
-    ble_gatts_char_handles_t characteristic_handles[ESTC_GATT_CHAR_COUNT];
-    uint8_t uuid_type;
-    bool notification_enabled;
-    bool indication_enabled;
-    bool indication_in_flight;
-} ble_estc_service_t;
+    estc_service_write_handler_t write_handler;
+    void*                        p_context;
+    uint8_t                      initial_state;
+    uint16_t                     initial_hue;
+    uint8_t                      initial_saturation;
+    uint8_t                      initial_value;
+} ble_estc_service_init_t;
 
-ret_code_t estc_ble_service_init(ble_estc_service_t* service);
+struct ble_estc_service_s {
+    uint16_t                     service_handle;
+    uint16_t                     connection_handle;
+    ble_gatts_char_handles_t     characteristic_handles[ESTC_LED_CHAR_COUNT];
+    uint8_t                      uuid_type;
+    bool                         notification_enabled[ESTC_LED_CHAR_COUNT];
+    estc_service_write_handler_t write_handler;
+    void*                        p_write_context;
+};
 
-void estc_ble_service_on_ble_event(const ble_evt_t* ble_evt, void* ctx);
+ret_code_t estc_ble_service_init(ble_estc_service_t*            p_service,
+                                 ble_estc_service_init_t const* p_init);
 
-ret_code_t estc_update_characteristic_value(ble_estc_service_t* service, size_t char_idx, void* p_value, size_t value_len);
+void estc_ble_service_on_ble_event(ble_evt_t const* p_ble_evt, void* p_context);
 
-ret_code_t estc_send_characteristic_value(ble_estc_service_t* service, estc_gatt_chars_t char_idx, void* p_value, size_t value_len);
+ret_code_t estc_ble_service_set_state(ble_estc_service_t* p_service,
+                                      uint8_t             state,
+                                      bool                notify);
+
+ret_code_t estc_ble_service_set_hue(ble_estc_service_t* p_service,
+                                    uint16_t            hue,
+                                    bool                notify);
+
+ret_code_t estc_ble_service_set_saturation(ble_estc_service_t* p_service,
+                                           uint8_t             saturation,
+                                           bool                notify);
+
+ret_code_t estc_ble_service_set_value(ble_estc_service_t* p_service,
+                                      uint8_t             value,
+                                      bool                notify);
 
 #endif /* ESTC_SERVICE_H__ */
